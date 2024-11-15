@@ -88,6 +88,8 @@ void Flying() {
   //   of your program
   pinMode(IO0,OUTPUT);
   pinMode(IO1,OUTPUT);
+  pinMode(IO2, OUTPUT);
+  pinMode(IO3, OUTPUT);
   digitalWrite(IO0, HIGH);
   delay(1000);
   digitalWrite(IO0, LOW);
@@ -216,6 +218,15 @@ void Flying() {
       int value1 = sensor1count;              //sensor count number up from zero
       int value2 = 55000;                     //SIMULATED SENSOR VALUE,need to calculate real value
       int value3 = 14;                        //SIMULATED SENSOR VALUE,need to calculate real value
+
+
+      digitalWrite(IO2, HIGH);
+      // digitalWrite(9, LOW);
+      delay(10000);
+      digitalWrite(IO2, LOW);
+      // digitalWrite(9,HIGH);
+      delay(10000);
+
       //
       add2text(value1, value2, value3);       //add the values to the text buffer
       //    
