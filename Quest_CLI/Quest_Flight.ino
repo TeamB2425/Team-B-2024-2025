@@ -38,6 +38,12 @@ Files Required to make a complete program -
 
 #include "Quest_Flight.h"
 #include "Quest_CLI.h"
+#include <Arduino.h>
+#include <Wire.h>
+#include <SparkFun_AS7331.h>
+
+SfeAS7331ArdI2C myUVSensor;
+
 
 //////////////////////////////////////////////////////////////////////////
 //    This defines the timers used to control flight operations
@@ -58,6 +64,7 @@ Files Required to make a complete program -
 #define TimeEvent1_time     ((one_min * 60) / SpeedFactor)      //take a photo time
 #define Sensor1time         ((one_min * 15) / SpeedFactor)      //Time to make Sensor1 readings 
 #define Sensor2time         ((one_sec * 20)  / SpeedFactor) 
+#define ValveSwitchTime     ((one_hour * 720) / SpeedFactor)    //Time between switching the valves
 //
   int sensor1count = 0;     //counter of times the sensor has been accessed
   int sensor2count = 0;     //counter of times the sensor has been accessed
@@ -93,6 +100,25 @@ void Flying() {
   digitalWrite(IO0, HIGH);
   delay(1000);
   digitalWrite(IO0, LOW);
+
+   Wire.begin();
+
+   if(myUVSensor.begin() == false) {
+    Serial.println("Sensor failed to begin. Please check your wiring!");
+    Serial.println("Halting...");
+    while(1);
+  }
+
+  Serial.println("Sensor began.");
+
+  // Set measurement mode and change device operating mode to measure.
+  if(myUVSensor.prepareMeasurement(MEAS_MODE_CMD) == false) {
+    Serial.println("Sensor did not get set properly.");
+    Serial.println("Halting...");
+    while(1);
+  }
+
+  Serial.println("Set mode to command.");
   
   //
   //
@@ -215,21 +241,13 @@ void Flying() {
     if ((millis() - Sensor1Timer) > Sensor1time) {    //Is it time to read?
       Sensor1Timer = millis();                        //Yes, lets read the sensor1
       sensor1count++;
-      int value1 = sensor1count;              //sensor count number up from zero
-      int value2 = 55000;                     //SIMULATED SENSOR VALUE,need to calculate real value
-      int value3 = 14;                        //SIMULATED SENSOR VALUE,need to calculate real value
-
-
-      digitalWrite(IO2, HIGH);
-      // digitalWrite(9, LOW);
-      delay(10000);
-      digitalWrite(IO2, LOW);
-      // digitalWrite(9,HIGH);
-      delay(10000);
-
-      //
-      add2text(value1, value2, value3);       //add the values to the text buffer
-      //    
+      
+      if((millis() < ValveSwitchTime) {
+        digitalWrite(IO1, HIGH); //Turn on the pump
+        delay(13000); //delay for the pump
+        digitalWrite(IO1, LOW); //Turn off the pump
+      }
+      
     }     // End of Sensor1 time event
     //
 //**********************************************************************
@@ -242,19 +260,33 @@ void Flying() {
     if ((millis() - Sensor2Timer) > Sensor2time) {    //Is it time to read?
       Sensor2Timer = millis();                        //Yes, lets read the sensor1
       sensor2count++;
-      //
-      //  Here to calculate and store data
-      //
-      int Deadtime = millis()-Sensor2Deadmillis;      //time in millis sence last visit
-      Sensor2Deadmillis = millis();                   //set millis this visit
-      //
-      //**** now get ampli and SiPM *****
-      int ampli = 555;              //SIMULATED
-      int SiPM  = 888;              //SIMULATED
-      //***** end simulated *************
-      //
-      dataappend(sensor2count, ampli, SiPM, Deadtime);
-    }     // End of Sensor2Timer          
+      // Send a start measurement command.
+      if(kSTkErrOk != myUVSensor.setStartState(true))
+        Serial.println("Error starting reading!");
+      
+      // Wait for a bit longer than the conversion time.
+      delay(2+myUVSensor.getConversionTimeMillis());
+    
+      // Read UV values.
+      if(kSTkErrOk != myUVSensor.readAllUV())
+        Serial.println("Error reading UV.");
+    
+      Serial.print("UVA:");
+      Serial.print(myUVSensor.getUVA());
+      Serial.print(" UVB:");
+      Serial.print(myUVSensor.getUVB());
+      Serial.print(" UVC:");
+      Serial.println(myUVSensor.getUVC());
+    }     // End of Sensor2Timer 
+
+//Switches over the valve at the end of the 30 days
+     if ((millis() - ValveSwitchTime) > 0) {
+        digitalWrite(IO2, HIGH); //switching valves
+        digitalWrite(IO1, HIGH); //turn on the pump
+        delay(10000); //delay to make sure to not pump too much
+        digitalWrite(IO1, LOW); //turn off the pump
+     }
+             
   }       // End of while 
 }         //End nof Flighting
 //
